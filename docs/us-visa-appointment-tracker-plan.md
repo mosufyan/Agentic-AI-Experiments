@@ -256,13 +256,14 @@ CREATE INDEX ON checks (started_at);
 
 ## 10. Implementation status
 
-Phase 1 scaffold lives in `visa_tracker/` (stdlib Python):
+Implemented in `visa_tracker/`:
 
-- Collectors: `demo` (offline) and `http_json` (pluggable public feed URL)
-- SQLite history + Telegram/log alerts
-- Dashboard + `/api/metrics`
-- Docker Compose for worker + dashboard
+| Phase | Delivered |
+|---|---|
+| 1 | `demo` + `http_json` collectors, SQLite, Telegram/log alerts, Docker Compose |
+| 2 | `auth_demo` + Playwright `auth` collector (feature-flagged, check-only, session dir, security Q&A env, selector overrides) |
+| 3 | Dashboard analytics: checks/interval/success, p_available by post×visa, by hour UTC, by day, hourly timeline, slot lifetimes, checks-by-source; `seed` command for test data |
 
-**Credentials:** Phase 1 does **not** need your usvisascheduling.com username/password. There is no official government slots API; use a reachable third-party JSON feed via `VISA_TRACKER_FEED_URL`.
+**Credentials:** Phase 1 / `auth_demo` need none. Phase 2 real auth uses env secrets only — never commit them. No official government slots API.
 
-**Cursor cost control:** build with included plan usage / cheaper models; do not run the 24/7 loop as Cloud Agents.
+**Cursor cost control:** included plan usage / cheaper models; 24/7 loop runs outside Cloud Agents.

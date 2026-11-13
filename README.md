@@ -1,65 +1,72 @@
 # Agentic-AI-Experiments
 
-Experiments and architecture notes for agentic systems.
+US visa appointment tracker for **H1B / H4** across India posts (Mumbai, New Delhi, Chennai, Hyderabad, Kolkata).
 
-## US Visa Appointment Tracker (Phase 1)
+## Status: Phases 1–3 implemented
 
-Alert-first monitor for **H1B / H4** availability across India posts (Mumbai, New Delhi, Chennai, Hyderabad, Kolkata).
+| Phase | What | Status |
+|---|---|---|
+| 0 | Buy vs build guidance | Documented |
+| 1 | Public / demo feeds + alerts + SQLite | Done |
+| 2 | Authenticated check-only watcher (Playwright) + `auth_demo` | Done (flagged off by default) |
+| 3 | Analytics dashboard (hourly/daily probability, timeline, lifetimes) | Done |
 
-- **No portal username/password required** for Phase 1
-- Stores every check in SQLite
-- Alerts via Telegram (optional) when slots appear
-- Local dashboard: check counts, interval, empirical availability probability
-- You still book manually on [usvisascheduling.com](https://www.usvisascheduling.com/)
+**No portal password needed** for Phase 1 / `auth_demo`. Phase 2 real auth stays **off** until you opt in.
 
-### Quick start (offline demo — no secrets)
+Alert-first only — **never auto-books**.
 
-```bash
-# one check
-python -m visa_tracker once
-
-# dashboard at http://127.0.0.1:8080
-python -m visa_tracker serve
-
-# continuous loop (uses VISA_TRACKER_INTERVAL_SEC, default 300s)
-python -m visa_tracker loop
-```
-
-Default collector is `demo` (stdlib only, no pip install).
-
-### Real public feed
-
-1. Copy `.env.example` → `.env`
-2. Set:
+## Quick start (local testing)
 
 ```bash
-VISA_TRACKER_COLLECTOR=http_json
-VISA_TRACKER_FEED_URL=https://your-accessible-json-feed
-# optional:
-VISA_TRACKER_FEED_API_KEY=
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
+# synthetic history for dashboard charts
+python3 -m visa_tracker seed --days 14 --interval-minutes 60
+
+# one live check (demo collector)
+VISA_TRACKER_COLLECTOR=demo python3 -m visa_tracker once
+
+# dual public+auth demo sources
+VISA_TRACKER_COLLECTOR=demo,auth_demo python3 -m visa_tracker once
+
+# dashboard
+python3 -m visa_tracker serve
+# open http://127.0.0.1:8080
 ```
 
-Expected JSON: a list (or `{ "slots": [...] }`) of objects with post, visa, slots_count, earliest_date. See `fixtures/sample_feed.json`.
-
-Many consumer slot websites block datacenter IPs. Run the worker on your home machine or a host that can reach your chosen feed.
-
-### Deploy
+## Real public feed (Phase 1)
 
 ```bash
 cp .env.example .env
-# edit .env
+# set:
+# VISA_TRACKER_COLLECTOR=http_json
+# VISA_TRACKER_FEED_URL=...
+# TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID
+python3 -m visa_tracker loop
+```
+
+## Phase 2 auth (optional)
+
+1. `pip install -r requirements-auth.txt && playwright install chromium`
+2. In `.env`:
+   - `VISA_TRACKER_AUTH_ENABLED=1`
+   - `VISA_TRACKER_COLLECTOR=http_json,auth` (or `auth` alone)
+   - username / password / `VISA_TRACKER_SECURITY_QA`
+3. Run from your own machine (not Cloud Agents). Check-only; tune selectors if the portal UI drifts.
+
+Account / ToS risk is yours — keep intervals ≥ 10–15 minutes with jitter.
+
+## Deploy
+
+```bash
+cp .env.example .env
 docker compose up -d --build
 ```
 
-- Worker: continuous checks  
-- Dashboard: port `8080`
+Worker + dashboard share a SQLite volume. For Playwright auth, run on a machine with browsers installed (Compose image is Phase 1/3 oriented).
 
-### Docs
+## Docs
 
 - [Architecture plan](docs/us-visa-appointment-tracker-plan.md)
 
-### Cost note (Cursor)
+## Cursor cost
 
-Build with included plan usage / cheaper models. Do **not** run the 24/7 checker as Cloud Agents — deploy the worker elsewhere so ongoing monitoring does not burn Cursor tokens.
+Build with included plan usage. Do **not** run the 24/7 loop as Cloud Agents.

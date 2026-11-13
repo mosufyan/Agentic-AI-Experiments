@@ -6,16 +6,21 @@ import sys
 
 from .config import load_settings
 from .dashboard import serve
+from .db import Store
 from .runner import run_loop, run_once
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="US visa appointment tracker (Phase 1)")
+    parser = argparse.ArgumentParser(description="US visa appointment tracker (Phases 1–3)")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("once", help="Run a single availability check")
-    sub.add_parser("loop", help="Run checks forever at VISA_TRACKER_INTERVAL_SEC")
-    sub.add_parser("serve", help="Serve the local metrics dashboard")
+    sub.add_parser("loop", help="Run checks forever (public + optional auth cadence)")
+    sub.add_parser("serve", help="Serve the analytics dashboard")
+
+    seed = sub.add_parser("seed", help="Seed synthetic history for Phase 3 dashboard testing")
+    seed.add_argument("--days", type=int, default=14)
+    seed.add_argument("--interval-minutes", type=int, default=60)
 
     args = parser.parse_args(argv)
     settings = load_settings()
@@ -29,6 +34,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.cmd == "serve":
         serve(settings)
+        return 0
+    if args.cmd == "seed":
+        store = Store(settings.db_path)
+        result = store.seed_history(
+            posts=settings.posts,
+            visas=settings.visa_classes,
+            days=args.days,
+            interval_minutes=args.interval_minutes,
+        )
+        print(json.dumps(result, indent=2))
         return 0
     return 2
 

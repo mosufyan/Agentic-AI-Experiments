@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import time
 from typing import Any
 
@@ -12,11 +13,17 @@ from .db import Store
 def run_once(settings: Settings | None = None) -> dict[str, Any]:
     settings = settings or load_settings()
     store = Store(settings.db_path)
-    collector = get_collector(settings)
-    check_id = store.start_check(getattr(collector, "source", settings.collector))
+    check_id = store.start_check(settings.collector)
     started = time.perf_counter()
 
     try:
+        collector = get_collector(settings)
+        # Update source now that collector is known.
+        with store.connect() as conn:
+            conn.execute(
+                "UPDATE checks SET source = ? WHERE id = ?",
+                (getattr(collector, "source", settings.collector), check_id),
+            )
         result = collector.collect()
         obs_ids = store.insert_observations(check_id, result.observations)
         decisions = decide_alerts(store, settings, obs_ids, result.observations)
@@ -41,14 +48,25 @@ def run_once(settings: Settings | None = None) -> dict[str, Any]:
         return {"ok": False, "check_id": check_id, "error": str(exc), "duration_ms": duration_ms}
 
 
+def _sleep_seconds(settings: Settings) -> int:
+    names = set(settings.collectors)
+    authish = bool(names & {"auth", "auth_portal", "portal"})
+    base = settings.auth_interval_sec if authish and settings.auth_enabled else settings.interval_sec
+    jitter = settings.auth_jitter_sec if authish else min(30, base // 10)
+    return base + random.randint(0, jitter)
+
+
 def run_loop(settings: Settings | None = None) -> None:
     settings = settings or load_settings()
     print(
         f"visa_tracker loop: collector={settings.collector} "
-        f"interval={settings.interval_sec}s db={settings.db_path}",
+        f"interval={settings.interval_sec}s auth_interval={settings.auth_interval_sec}s "
+        f"db={settings.db_path}",
         flush=True,
     )
     while True:
         result = run_once(settings)
         print(result, flush=True)
-        time.sleep(settings.interval_sec)
+        delay = _sleep_seconds(settings)
+        print(f"sleeping {delay}s", flush=True)
+        time.sleep(delay)

@@ -153,14 +153,66 @@ class HttpJsonCollector:
         )
 
 
-def get_collector(settings: Settings):
-    if settings.collector in {"demo", "mock"}:
+class CompositeCollector:
+    """Run multiple collectors and merge observations (max slots per post×visa)."""
+
+    def __init__(self, settings: Settings, names: tuple[str, ...]) -> None:
+        self.settings = settings
+        self.names = names
+        self._inner = [_build_one(settings, name) for name in names]
+        self.source = "+".join(getattr(c, "source", name) for c, name in zip(self._inner, names))
+
+    def collect(self) -> CollectResult:
+        merged: dict[tuple[str, str], ObservationRow] = {}
+        meta: dict[str, Any] = {"sources": []}
+        for collector in self._inner:
+            result = collector.collect()
+            meta["sources"].append({"source": result.source, "meta": result.raw_meta})
+            for row in result.observations:
+                key = (row.post_id, row.visa_class_id)
+                prev = merged.get(key)
+                if prev is None or row.slots_count > prev.slots_count:
+                    merged[key] = ObservationRow(
+                        post_id=row.post_id,
+                        visa_class_id=row.visa_class_id,
+                        slots_count=row.slots_count,
+                        earliest_date=row.earliest_date,
+                        fingerprint=fingerprint(
+                            row.post_id, row.visa_class_id, row.slots_count, row.earliest_date
+                        ),
+                        raw={"merged_from": result.source, **row.raw},
+                    )
+        return CollectResult(
+            source=self.source,
+            observations=list(merged.values()),
+            raw_meta=meta,
+        )
+
+
+def _build_one(settings: Settings, name: str):
+    from .auth_collector import AuthDemoCollector, AuthPortalCollector
+
+    if name in {"demo", "mock"}:
         return DemoCollector(settings)
-    if settings.collector in {"http_json", "http", "json"}:
+    if name in {"http_json", "http", "json"}:
         return HttpJsonCollector(settings)
+    if name in {"auth_demo"}:
+        return AuthDemoCollector(settings)
+    if name in {"auth", "auth_portal", "portal"}:
+        return AuthPortalCollector(settings)
     raise ValueError(
-        f"Unknown collector '{settings.collector}'. Use 'demo' or 'http_json'."
+        f"Unknown collector '{name}'. "
+        "Use demo, http_json, auth_demo, auth (or comma-separated mix)."
     )
+
+
+def get_collector(settings: Settings):
+    names = settings.collectors
+    if len(names) == 1:
+        return _build_one(settings, names[0])
+    if len(names) > 1:
+        return CompositeCollector(settings, names)
+    raise ValueError("VISA_TRACKER_COLLECTOR is empty")
 
 
 def _extract_items(payload: Any) -> list[dict[str, Any]]:
