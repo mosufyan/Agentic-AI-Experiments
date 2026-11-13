@@ -1,0 +1,2 @@
+# Optional Phase 2 dependency (real portal watcher only)
+playwright>=1.49.0
