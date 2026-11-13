@@ -1,0 +1,25 @@
+services:
+  worker:
+    build: .
+    command: ["python", "-m", "visa_tracker", "loop"]
+    env_file:
+      - .env
+    volumes:
+      - tracker_data:/data
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    command: ["python", "-m", "visa_tracker", "serve"]
+    env_file:
+      - .env
+    environment:
+      VISA_TRACKER_DASHBOARD_HOST: "0.0.0.0"
+    ports:
+      - "8080:8080"
+    volumes:
+      - tracker_data:/data
+    restart: unless-stopped
+
+volumes:
+  tracker_data:

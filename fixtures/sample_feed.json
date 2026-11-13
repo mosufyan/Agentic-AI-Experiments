@@ -1,0 +1,15 @@
+{
+  "slots": [
+    {
+      "post": "mumbai",
+      "visa": "H1B",
+      "slots_count": 0
+    },
+    {
+      "post": "chennai",
+      "visa": "H4",
+      "slots_count": 1,
+      "earliest_date": "2026-12-15"
+    }
+  ]
+}

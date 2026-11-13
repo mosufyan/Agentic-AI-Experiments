@@ -254,12 +254,15 @@ CREATE INDEX ON checks (started_at);
 
 ---
 
-## 10. Next decision for you
+## 10. Implementation status
 
-Reply with one of:
+Phase 1 scaffold lives in `visa_tracker/` (stdlib Python):
 
-1. **MVP build** — Phase 1 public monitor + Telegram + dashboard scaffold in this repo  
-2. **Plan only** — stop at this document (current deliverable)  
-3. **Phase 2 spike** — research-only Playwright login flow design (still no auto-book)
+- Collectors: `demo` (offline) and `http_json` (pluggable public feed URL)
+- SQLite history + Telegram/log alerts
+- Dashboard + `/api/metrics`
+- Docker Compose for worker + dashboard
 
-Default recommendation: **(1) MVP build** after you confirm Telegram as the alert channel and which posts to watch (all five vs a subset).
+**Credentials:** Phase 1 does **not** need your usvisascheduling.com username/password. There is no official government slots API; use a reachable third-party JSON feed via `VISA_TRACKER_FEED_URL`.
+
+**Cursor cost control:** build with included plan usage / cheaper models; do not run the 24/7 loop as Cloud Agents.
